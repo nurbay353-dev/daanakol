@@ -6,6 +6,7 @@
 <title>Даана-кол фонду</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -92,32 +93,31 @@
   .entry .row-btns button{font-size:11px; padding:5px 10px; border-radius:4px; border:1px solid var(--line); background:#fff; color:var(--ink-muted); cursor:pointer; font-family:'IBM Plex Mono',monospace;}
   .empty-state{text-align:center; color:var(--ink-muted); padding:30px 10px; font-size:13px;}
 
-  /* notebook-style public ledger */
+  /* notebook-style public ledger — squared exercise-book paper, blue ink */
   .notebook{
-    background-color:#fffdf6;
-    background-image: repeating-linear-gradient(to bottom, transparent, transparent 31px, #c3d2e8 32px);
+    background-color:#fdfdfb;
+    background-image:
+      linear-gradient(to right, #b7c8ea 1px, transparent 1px),
+      linear-gradient(to bottom, #b7c8ea 1px, transparent 1px);
+    background-size:15px 30px;
+    background-position:0 16px;
+    background-repeat:repeat;
     border-radius:4px;
-    padding:14px 18px 14px 40px;
+    padding:16px 18px;
     position:relative;
     box-shadow:0 12px 30px rgba(0,0,0,.35);
     margin-bottom:12px;
   }
-  .notebook::before{
-    content:"";
-    position:absolute;
-    left:24px; top:0; bottom:0;
-    width:1.5px;
-    background:#d9928c;
-  }
   .notebook-line{
     font-family:'Caveat',cursive;
-    font-size:23px;
-    line-height:32px;
-    color:#25345c;
+    font-weight:700;
+    font-size:20px;
+    line-height:30px;
+    color:#1a3f8f;
     white-space:normal;
     overflow-wrap:anywhere;
   }
-  .notebook-empty{font-family:'Caveat',cursive; font-size:21px; color:var(--ink-muted); line-height:32px; padding:6px 0;}
+  .notebook-empty{font-family:'Caveat',cursive; font-size:18px; color:var(--ink-muted); line-height:30px; padding:6px 0;}
 
   .overlay{display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:50; align-items:center; justify-content:center; padding:20px;}
   .overlay.active{display:flex;}
@@ -143,6 +143,7 @@
   <div class="sub">адам башына <span id="priceDisplay">150</span> сом</div>
   <nav>
     <button class="tab-btn active" data-view="donate">Которуу</button>
+    <button class="tab-btn" data-view="archive">Архив</button>
     <button class="tab-btn" data-view="admin">Админ</button>
   </nav>
 </header>
@@ -171,7 +172,7 @@
 
       <div class="receipt">
         <h2>Чегиңизди кошуңуз</h2>
-        <div class="center-muted">Камера менен тартыңыз же файлдан тандаңыз — AI өзү окуйт</div>
+        <div class="center-muted">Камера менен тартыңыз же файлдан тандаңыз — өзү окуйт</div>
 
         <div id="scanIdle" class="scan-buttons">
           <button onclick="document.getElementById('cameraInput').click()">📷 Камера</button>
@@ -182,7 +183,7 @@
 
         <div id="previewBlock" style="display:none;">
           <div class="preview-wrap"><img id="previewImg"></div>
-          <button class="btn blue" id="analyzeBtn" onclick="analyzeReceipt()">🤖 AI менен окутуу</button>
+          <button class="btn blue" id="analyzeBtn" onclick="analyzeReceipt()">🔎 Чекти окуу</button>
           <button class="btn secondary" onclick="resetScan()">Баштан баштоо</button>
           <div class="status-line" id="statusLine"></div>
         </div>
@@ -195,14 +196,17 @@
 
         <div id="reviewBlock" style="display:none;">
           <div class="dashed"></div>
-          <div class="center-muted">AI окуган маалымат — текшерип, керек болсо түзөтүңүз</div>
+          <div class="center-muted">Окулган маалымат — так эмес болушу мүмкүн, текшерип түзөтүңүз</div>
           <div id="recipientInfo" class="status-line" style="margin-top:0;"></div>
           <label>Аты-жөндөр (сапма-сап)</label>
           <textarea id="publicNamesInput" oninput="recalcPublic()"></textarea>
           <label>Которулган сумма (сом)</label>
           <input type="number" id="publicAmountInput" oninput="recalcPublic()">
-          <label>Которгон дата/убакыт (эгер белгилүү болсо)</label>
-          <input type="text" id="publicDatetimeInput" placeholder="2026-08-22 14:30">
+          <div id="amountLockedNote" style="display:none; font-size:12px; color:var(--ink-muted); margin-top:4px;">
+            Сумма чектен автоматтык окулду, өзгөртүүгө болбойт. Туура эмес болсо:
+            <a href="#" id="amountWhatsappLink" target="_blank" style="color:var(--red); font-weight:bold;">Админге кайрылыңыз</a>
+          </div>
+          <input type="hidden" id="publicDatetimeInput">
           <div class="amount-check neutral" id="publicAmountCheck">—</div>
           <button class="btn" id="publicAddBtn" disabled onclick="tryAddEntry(true)">Тизмеге кошуу</button>
           <button class="btn secondary" onclick="resetScan()">Жокко чыгаруу</button>
@@ -215,7 +219,12 @@
       <div style="text-align:right;"><div class="n" id="pubTotalSum">0</div><div class="l">СОМ</div></div>
     </div>
     <div class="notebook" id="publicEntriesList"></div>
-    <button class="btn secondary" onclick="takeScreenshot()">📸 Скриншот сактоо</button>
+    <button class="btn secondary" id="screenshotBtn" style="display:none;" onclick="takeScreenshot()">📸 Скриншот сактоо</button>
+  </section>
+
+  <!-- ARCHIVE VIEW (public) -->
+  <section class="view" id="view-archive">
+    <div id="archiveList"></div>
   </section>
 
   <!-- ADMIN VIEW -->
@@ -234,10 +243,9 @@
     <div id="adminContent" style="display:none;">
       <nav style="margin:-6px 0 16px;">
         <button class="tab-btn admin-sub active" data-sub="fund">Фонд</button>
-        <button class="tab-btn admin-sub" data-sub="archive">Архив</button>
         <button class="tab-btn admin-sub" data-sub="add">Кол менен кошуу</button>
         <button class="tab-btn admin-sub" data-sub="list">Тизме</button>
-        <button class="tab-btn admin-sub" data-sub="settings">Жөндөө</button>
+        <button class="tab-btn admin-sub" id="tabSettingsBtn" data-sub="settings">Жөндөө</button>
       </nav>
 
       <div class="sub-view active" id="sub-fund">
@@ -270,10 +278,6 @@
         </div>
       </div>
 
-      <div class="sub-view" id="sub-archive" style="display:none;">
-        <div id="archiveList"></div>
-      </div>
-
       <div class="sub-view" id="sub-add" style="display:none;">
         <div class="receipt">
           <h2>Кол менен кошуу</h2>
@@ -302,8 +306,6 @@
           <input type="text" id="cfgToken" placeholder="123456:ABC-DEF...">
           <label>Telegram chat_id</label>
           <input type="text" id="cfgChatId" placeholder="-1001234567890">
-          <label>Gemini API ачкычы (чек окуу үчүн)</label>
-          <input type="text" id="cfgGemini" placeholder="AIza...">
           <label>Адам башына сумма (сом)</label>
           <input type="number" id="cfgPrice" placeholder="150">
           <label>Карта/эсеп номери</label>
@@ -318,10 +320,44 @@
           <label>Админдин WhatsApp номери (окшош ат эскертүүсү үчүн)</label>
           <input type="text" id="cfgWhatsapp" placeholder="996700123456">
           <div class="dashed"></div>
-          <label>Жаңы PIN коюу</label>
-          <input type="password" id="cfgPin" inputmode="numeric" maxlength="6" placeholder="••••">
+          <label>Админдин жаңы PIN коду (6 сан)</label>
+          <input type="password" id="cfgAdminPin" inputmode="numeric" maxlength="6" placeholder="••••••">
+          <label>Супер админдин жаңы PIN коду (6 сан)</label>
+          <input type="password" id="cfgSuperPin" inputmode="numeric" maxlength="6" placeholder="••••••">
           <button class="btn" onclick="saveSettings()">Сактоо</button>
           <button class="btn secondary" onclick="testTelegram()">Telegram'ды текшерүү</button>
+        </div>
+
+        <div class="receipt" id="ocrTrainPanel">
+          <h2>🎓 Автоматтык окууну үйрөтүү</h2>
+          <div class="center-muted">Бир нече чекти жүктөп, туура эмес окулган жерлерин оңдоп сактаңыз — кийинки жолу окуганда ошол оңдоолор автоматтык колдонулат</div>
+
+          <div id="trainIdle" class="scan-buttons">
+            <button onclick="document.getElementById('trainCameraInput').click()">📷 Камера</button>
+            <button onclick="document.getElementById('trainFileInput').click()">🖼️ Файлдан</button>
+          </div>
+          <input type="file" id="trainCameraInput" class="hidden-input" accept="image/*" capture="environment">
+          <input type="file" id="trainFileInput" class="hidden-input" accept="image/*">
+
+          <div id="trainPreviewBlock" style="display:none;">
+            <div class="preview-wrap"><img id="trainPreviewImg"></div>
+            <button class="btn blue" id="trainOcrBtn" onclick="runTrainOcr()">🔎 Окуп көрүү</button>
+            <button class="btn secondary" onclick="resetTrainScan()">Баштан баштоо</button>
+            <div class="status-line" id="trainStatusLine"></div>
+          </div>
+
+          <div id="trainEditBlock" style="display:none;">
+            <div class="dashed"></div>
+            <label>Окулган тексти (салыштыруу үчүн, өзгөртпөңүз)</label>
+            <textarea id="trainRawText" readonly style="min-height:120px; background:var(--paper-2);"></textarea>
+            <label>Чектеги так, туура текстти ушул жерге жазыңыз</label>
+            <textarea id="trainCorrectedText" style="min-height:120px;"></textarea>
+            <button class="btn gold" onclick="saveOcrTraining()">Айырмаларды сактоо</button>
+            <button class="btn secondary" onclick="resetTrainScan()">Жокко чыгаруу</button>
+          </div>
+
+          <div class="dashed"></div>
+          <div id="trainCorrectionsList"></div>
         </div>
       </div>
     </div>
@@ -342,26 +378,112 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const DEFAULTS = { token:'', chatId:'', gemini:'', price:150, card:'', phone:'', owner:'', qr:'', whatsapp:'', pin:'' };
+const firebaseConfig = {
+  apiKey: "AIzaSyCgHQQscQhS5ba15-RVYTP-lnY83ifVv30",
+  authDomain: "fonddaanakol.firebaseapp.com",
+  projectId: "fonddaanakol",
+  storageBucket: "fonddaanakol.firebasestorage.app",
+  messagingSenderId: "564413526818",
+  appId: "1:564413526818:web:21a9259b01dc56b9fe2b7b",
+  measurementId: "G-5KCL32HR5J"
+};
+let db, sharedCfgRef, campaignRef, entriesCol, historyCol;
+let firebaseLoadFailed = false;
+
+function loadScriptWithFallback(urls){
+  return new Promise((resolve, reject)=>{
+    let i = 0;
+    function tryNext(){
+      if(i >= urls.length){ reject(new Error('бардык булактар жүктөлгөн жок')); return; }
+      const s = document.createElement('script');
+      s.src = urls[i++];
+      s.onload = ()=>resolve();
+      s.onerror = ()=>tryNext();
+      document.head.appendChild(s);
+    }
+    tryNext();
+  });
+}
+
+async function loadFirebaseAndInit(){
+  try{
+    await loadScriptWithFallback([
+      'https://cdnjs.cloudflare.com/ajax/libs/firebase/12.17.1/firebase-app-compat.min.js',
+      'https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js'
+    ]);
+    await loadScriptWithFallback([
+      'https://cdnjs.cloudflare.com/ajax/libs/firebase/12.17.1/firebase-firestore-compat.min.js',
+      'https://www.gstatic.com/firebasejs/12.17.1/firebase-firestore-compat.js'
+    ]);
+    if(typeof firebase === 'undefined') throw new Error('firebase глобалдык объект табылган жок');
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    // Newer Firestore SDK auto-detects long-polling when needed; no manual transport override required.
+    sharedCfgRef = db.collection('state').doc('config');
+    campaignRef = db.collection('state').doc('campaign');
+    entriesCol = db.collection('entries');
+    historyCol = db.collection('history');
+    firebaseLoadFailed = false;
+    initFirestoreSync();
+  }catch(e){
+    firebaseLoadFailed = true;
+    toast('Firebase жүктөлгөн жок: ' + (e && e.message ? e.message : 'белгисиз ката'));
+  }
+}
+
+const LOCAL_DEFAULTS = { token:'', chatId:'', pin:'', superPin:'' };
+const SHARED_DEFAULTS = { price:150, card:'', phone:'', owner:'', qr:'', whatsapp:'', ocrCorrections:[] };
 const CAMPAIGN_DEFAULTS = { status:'closed', deceasedName:'', location:'', time:'', openedAt:null, closedAt:null, expenses:[] };
-let cfg = loadConfig();
-let entries = loadEntries();
-let campaign = loadCampaign();
-let history_ = loadHistory();
+
+let cfg = loadLocalConfig();
+let sharedCfg = Object.assign({}, SHARED_DEFAULTS);
+let campaign = Object.assign({}, CAMPAIGN_DEFAULTS);
+let entries = [];
+let history_ = [];
+let firestoreReady = false;
+
 let pendingEntry = null;
 let pendingDuplicateNames = [];
 let pendingIsPublic = false;
 let currentImageBase64 = null;
 let currentImageMime = null;
 
-function loadConfig(){ try{ return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('ktr_config')||'{}')); }catch(e){ return Object.assign({}, DEFAULTS); } }
-function saveConfig(){ localStorage.setItem('ktr_config', JSON.stringify(cfg)); }
-function loadEntries(){ try{ return JSON.parse(localStorage.getItem('ktr_entries')||'[]'); }catch(e){ return []; } }
-function saveEntries(){ localStorage.setItem('ktr_entries', JSON.stringify(entries)); }
-function loadCampaign(){ try{ return Object.assign({}, CAMPAIGN_DEFAULTS, JSON.parse(localStorage.getItem('ktr_campaign')||'{}')); }catch(e){ return Object.assign({}, CAMPAIGN_DEFAULTS); } }
-function saveCampaign(){ localStorage.setItem('ktr_campaign', JSON.stringify(campaign)); }
-function loadHistory(){ try{ return JSON.parse(localStorage.getItem('ktr_history')||'[]'); }catch(e){ return []; } }
-function saveHistory(){ localStorage.setItem('ktr_history', JSON.stringify(history_)); }
+function loadLocalConfig(){ try{ return Object.assign({}, LOCAL_DEFAULTS, JSON.parse(localStorage.getItem('ktr_local')||'{}')); }catch(e){ return Object.assign({}, LOCAL_DEFAULTS); } }
+function saveLocalConfig(){ localStorage.setItem('ktr_local', JSON.stringify(cfg)); }
+
+function initFirestoreSync(){
+  sharedCfgRef.onSnapshot(snap=>{
+    sharedCfg = snap.exists ? Object.assign({}, SHARED_DEFAULTS, snap.data()) : Object.assign({}, SHARED_DEFAULTS);
+    firestoreReady = true;
+    renderDonateView(); recalc(); recalcPublic(); renderPublicList();
+    if(sessionStorage.getItem('ktr_admin_ok')==='1') fillSettingsForm();
+  }, err=>{ toast('Firestore менен байланыш жок — интернетти текшериңиз'); });
+
+  campaignRef.onSnapshot(snap=>{
+    campaign = snap.exists ? Object.assign({}, CAMPAIGN_DEFAULTS, snap.data()) : Object.assign({}, CAMPAIGN_DEFAULTS);
+    renderDonateView();
+    if(sessionStorage.getItem('ktr_admin_ok')==='1') renderFundAdmin();
+  }, err=>{ toast('Firestore менен байланыш жок — интернетти текшериңиз'); });
+
+  entriesCol.orderBy('addedEpoch','asc').onSnapshot(snap=>{
+    entries = snap.docs.map(d=>Object.assign({ id:d.id }, d.data()));
+    renderPublicList();
+    if(sessionStorage.getItem('ktr_admin_ok')==='1'){ renderList(); renderFundAdmin(); }
+  }, err=>{ toast('Firestore менен байланыш жок — интернетти текшериңиз'); });
+
+  historyCol.orderBy('archivedAt','desc').onSnapshot(snap=>{
+    history_ = snap.docs.map(d=>Object.assign({ id:d.id }, d.data()));
+    renderArchive();
+    if(sessionStorage.getItem('ktr_admin_ok')==='1') renderFundAdmin();
+  });
+}
+async function clearEntriesCollection(){
+  const snap = await entriesCol.get();
+  if(snap.empty) return;
+  const batch = db.batch();
+  snap.docs.forEach(d=>batch.delete(d.ref));
+  await batch.commit();
+}
 
 function toast(msg){
   const t=document.getElementById('toast');
@@ -380,6 +502,7 @@ document.querySelectorAll('.tab-btn[data-view]').forEach(btn=>{
 });
 document.querySelectorAll('.admin-sub').forEach(btn=>{
   btn.addEventListener('click', ()=>{
+    if(btn.dataset.sub==='settings' && sessionStorage.getItem('ktr_superadmin_ok')!=='1'){ return; }
     document.querySelectorAll('.admin-sub').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.sub-view').forEach(v=>v.style.display='none');
@@ -387,19 +510,27 @@ document.querySelectorAll('.admin-sub').forEach(btn=>{
     if(btn.dataset.sub==='list') renderList();
     if(btn.dataset.sub==='settings') fillSettingsForm();
     if(btn.dataset.sub==='fund') renderFundAdmin();
-    if(btn.dataset.sub==='archive') renderArchive();
   });
 });
 
 /* ---------- fund / campaign ---------- */
+function computeReserve(){
+  return history_.reduce((sum,h)=>{
+    const collected = (h.entries||[]).reduce((s,e)=>s+e.amount,0);
+    const expensesTotal = ((h.campaign||{}).expenses||[]).reduce((s,x)=>s+x.amount,0);
+    return sum + (collected - expensesTotal);
+  }, 0);
+}
 function renderFundAdmin(){
   const statusArea = document.getElementById('fundStatusArea');
   const openForm = document.getElementById('fundOpenForm');
   const closeArea = document.getElementById('fundCloseArea');
+  const reserve = computeReserve();
+  const reserveLine = `<div class="status-line" style="margin-top:6px;">💰 Жалпы запас (мурунку фонддордон калган): <b>${reserve}</b> сом</div>`;
   if(campaign.status==='open'){
     statusArea.innerHTML = `<span class="fund-status-pill open">АЧЫК</span><br>
       <b>${escapeHtml(campaign.deceasedName)}</b><br>
-      ${escapeHtml(campaign.location||'')} ${campaign.time?('саат '+escapeHtml(campaign.time)):''}`;
+      ${escapeHtml(campaign.location||'')} ${campaign.time?('саат '+escapeHtml(campaign.time)):''}` + reserveLine;
     openForm.style.display='none';
     closeArea.style.display='block';
 
@@ -424,7 +555,7 @@ function renderFundAdmin(){
     `).join('') : '<div class="empty-state">Азырынча чыгым катталган жок</div>';
   } else {
     statusArea.innerHTML = `<span class="fund-status-pill closed">ЖАБЫК</span>` +
-      (campaign.deceasedName ? `<br><span style="color:var(--ink-muted); font-size:12px;">Акыркы: ${escapeHtml(campaign.deceasedName)}</span>` : '');
+      (campaign.deceasedName ? `<br><span style="color:var(--ink-muted); font-size:12px;">Акыркы: ${escapeHtml(campaign.deceasedName)}</span>` : '') + reserveLine;
     document.getElementById('fundName').value='';
     document.getElementById('fundLocation').value='';
     document.getElementById('fundTime').value='';
@@ -432,83 +563,146 @@ function renderFundAdmin(){
     closeArea.style.display='none';
   }
 }
-function openFund(){
+async function openFund(){
   const name = document.getElementById('fundName').value.trim();
   if(!name){ toast('Аты-фамилиясын киргизиңиз'); return; }
   const location = document.getElementById('fundLocation').value.trim();
   const time = document.getElementById('fundTime').value.trim();
-  if(entries.length>0 || (campaign.expenses||[]).length>0){
-    history_.push({ campaign: Object.assign({}, campaign), entries: entries.slice(), archivedAt: Date.now() });
-    saveHistory();
-    entries = [];
-    saveEntries();
-  }
-  campaign = { status:'open', deceasedName:name, location, time, openedAt: Date.now(), closedAt:null, expenses:[] };
-  saveCampaign();
-  toast('Фонд ачылды ✓');
-  renderFundAdmin();
-  renderDonateView();
-  renderPublicList();
-  renderList();
+  try{
+    if(entries.length>0 || (campaign.expenses||[]).length>0){
+      await historyCol.add({ campaign: Object.assign({}, campaign), entries: entries.map(({id,...rest})=>rest), archivedAt: Date.now() });
+      await clearEntriesCollection();
+    }
+    const newCampaign = { status:'open', deceasedName:name, location, time, openedAt: Date.now(), closedAt:null, expenses:[] };
+    await campaignRef.set(newCampaign);
+    toast('Фонд ачылды ✓');
+  }catch(e){ toast('Ката кетти — интернетти текшериңиз'); }
 }
-function addExpense(){
+async function addExpense(){
   const amount = parseFloat(document.getElementById('expenseAmount').value)||0;
   if(amount<=0){ toast('Сумманы киргизиңиз'); return; }
   const note = document.getElementById('expenseNote').value.trim();
-  if(!campaign.expenses) campaign.expenses = [];
-  campaign.expenses.push({ id: Date.now().toString(36)+Math.random().toString(36).slice(2,5), amount, note, date: new Date().toLocaleString('ky-KG') });
-  saveCampaign();
-  document.getElementById('expenseAmount').value='';
-  document.getElementById('expenseNote').value='';
-  toast('Катталды ✓');
-  renderFundAdmin();
+  const updated = Object.assign({}, campaign);
+  updated.expenses = (updated.expenses||[]).concat([{ id: Date.now().toString(36)+Math.random().toString(36).slice(2,5), amount, note, date: new Date().toLocaleString('ky-KG') }]);
+  try{
+    await campaignRef.set(updated);
+    document.getElementById('expenseAmount').value='';
+    document.getElementById('expenseNote').value='';
+    toast('Катталды ✓');
+  }catch(e){ toast('Ката кетти — интернетти текшериңиз'); }
 }
-function deleteExpense(id){
-  campaign.expenses = (campaign.expenses||[]).filter(x=>x.id!==id);
-  saveCampaign();
-  renderFundAdmin();
+async function deleteExpense(id){
+  const updated = Object.assign({}, campaign);
+  updated.expenses = (updated.expenses||[]).filter(x=>x.id!==id);
+  try{ await campaignRef.set(updated); }catch(e){ toast('Ката кетти'); }
 }
-function closeFund(){
-  history_.push({ campaign: Object.assign({}, campaign, {status:'closed', closedAt: Date.now()}), entries: entries.slice(), archivedAt: Date.now() });
-  saveHistory();
-  campaign.status='closed';
-  campaign.closedAt = Date.now();
-  saveCampaign();
-  entries = [];
-  saveEntries();
-  toast('Фонд жабылды жана архивге кошулду ✓');
-  renderFundAdmin();
-  renderDonateView();
-  renderPublicList();
-  renderList();
+async function closeFund(){
+  try{
+    await historyCol.add({ campaign: Object.assign({}, campaign, {status:'closed', closedAt: Date.now()}), entries: entries.map(({id,...rest})=>rest), archivedAt: Date.now() });
+    // Reset expenses (not the whole campaign) — leaving old expenses on a "closed" campaign doc
+    // causes the next openFund() to think there's still unarchived data and silently create a
+    // phantom duplicate archive entry (0 people, but the old expense total still attached).
+    // deceasedName/location/time are kept so the admin screen can still show "Акыркы: <name>".
+    const updated = Object.assign({}, campaign, { status:'closed', closedAt: Date.now(), expenses: [] });
+    await campaignRef.set(updated);
+    await clearEntriesCollection();
+    toast('Фонд жабылды жана архивге кошулду ✓');
+  }catch(e){ toast('Ката кетти — интернетти текшериңиз'); }
 }
+let editingArchiveId = null;
 function renderArchive(){
   const el = document.getElementById('archiveList');
-  if(history_.length===0){ el.innerHTML = '<div class="empty-state">Архив азырынча бош</div>'; return; }
+  const reserve = computeReserve();
+  const reserveBlock = `<div class="totals-bar" style="margin-bottom:14px;">
+      <div><div class="n">${history_.length}</div><div class="l">ЖАБЫЛГАН ФОНД</div></div>
+      <div style="text-align:right;"><div class="n">${reserve}</div><div class="l">ЖАЛПЫ ЗАПАС</div></div>
+    </div>`;
+  if(history_.length===0){ el.innerHTML = reserveBlock + '<div class="empty-state">Архив азырынча бош</div>'; return; }
+  const isSuper = sessionStorage.getItem('ktr_superadmin_ok')==='1';
   const sorted = [...history_].sort((a,b)=>b.archivedAt-a.archivedAt);
-  el.innerHTML = sorted.map((h,i)=>{
+  el.innerHTML = reserveBlock + sorted.map((h,i)=>{
     const c = h.campaign||{};
     const count = (h.entries||[]).reduce((s,e)=>s+e.names.length,0);
     const collected = (h.entries||[]).reduce((s,e)=>s+e.amount,0);
     const expensesTotal = (c.expenses||[]).reduce((s,x)=>s+x.amount,0);
     const remaining = collected - expensesTotal;
-    return `
-      <div class="receipt">
+    const sortedEntries = [...(h.entries||[])].sort((a,b)=>(a.addedEpoch||0)-(b.addedEpoch||0));
+    let idx=0;
+    const nameLines = [];
+    sortedEntries.forEach(e=>{
+      e.names.forEach(n=>{
+        idx++;
+        nameLines.push(`<div>${idx}. ${escapeHtml(n)}</div>`);
+      });
+    });
+    const isEditing = isSuper && editingArchiveId===h.id;
+    const headerBlock = isEditing ? `
+        <label>Кимге арналат (аты-фамилиясы)</label>
+        <input type="text" id="arcName-${h.id}" value="${escapeHtml(c.deceasedName||'')}">
+        <label>Акыркы сапарга узатуу кайсы жерде болот</label>
+        <input type="text" id="arcLoc-${h.id}" value="${escapeHtml(c.location||'')}">
+        <label>Саат канчада</label>
+        <input type="text" id="arcTime-${h.id}" value="${escapeHtml(c.time||'')}">
+        <button class="btn blue" onclick="saveArchiveEdit('${h.id}')">Сактоо</button>
+        <button class="btn secondary" onclick="cancelArchiveEdit()">Жокко чыгаруу</button>
+      ` : `
         <h2>${escapeHtml(c.deceasedName||'Аты жок')}</h2>
         <div class="center-muted">${escapeHtml(c.location||'')} ${c.time?('· саат '+escapeHtml(c.time)):''}</div>
+      `;
+    const superControls = isSuper && !isEditing ? `
+        <div class="row-btns" style="margin-top:8px;">
+          <button onclick="startArchiveEdit('${h.id}')" style="border:1px solid var(--line); background:#fff; color:var(--ink-muted); border-radius:4px; padding:5px 10px; font-size:11px; cursor:pointer;">Түзөтүү</button>
+          <button onclick="deleteArchiveEntry('${h.id}')" style="border:1px solid var(--red); background:#fff; color:var(--red); border-radius:4px; padding:5px 10px; font-size:11px; cursor:pointer;">Өчүрүү</button>
+        </div>` : '';
+    return `
+      <div class="receipt">
+        ${headerBlock}
         <div class="totals-bar" style="margin-bottom:10px;">
           <div><div class="n">${collected}</div><div class="l">ЧОГУЛГАН</div></div>
           <div><div class="n">${expensesTotal}</div><div class="l">ЧЫГЫМ</div></div>
           <div style="text-align:right;"><div class="n">${remaining}</div><div class="l">КАЛГАН</div></div>
         </div>
-        <div class="status-line">${count} адам катталган</div>
+        <div class="status-line" style="margin-bottom:8px;">${count} адам катталган${isSuper ? '' : ' (окуу үчүн гана)'}</div>
+        <div style="font-size:13px; line-height:1.7; max-height:260px; overflow-y:auto; background:var(--paper-2); border-radius:6px; padding:10px 12px;">
+          ${nameLines.length ? nameLines.join('') : '<div class="empty-state">Тизме бош</div>'}
+        </div>
+        ${superControls}
       </div>`;
   }).join('');
+}
+function startArchiveEdit(id){
+  if(sessionStorage.getItem('ktr_superadmin_ok')!=='1') return;
+  editingArchiveId = id;
+  renderArchive();
+}
+function cancelArchiveEdit(){
+  editingArchiveId = null;
+  renderArchive();
+}
+async function saveArchiveEdit(id){
+  if(sessionStorage.getItem('ktr_superadmin_ok')!=='1') return;
+  const h = history_.find(x=>x.id===id);
+  if(!h) return;
+  const updatedCampaign = Object.assign({}, h.campaign||{}, {
+    deceasedName: document.getElementById('arcName-'+id).value.trim(),
+    location: document.getElementById('arcLoc-'+id).value.trim(),
+    time: document.getElementById('arcTime-'+id).value.trim()
+  });
+  try{
+    await historyCol.doc(id).update({ campaign: updatedCampaign });
+    editingArchiveId = null;
+    toast('Сакталды ✓');
+  }catch(e){ toast('Сакталган жок — интернетти текшериңиз'); }
+}
+async function deleteArchiveEntry(id){
+  if(sessionStorage.getItem('ktr_superadmin_ok')!=='1') return;
+  try{ await historyCol.doc(id).delete(); toast('Өчүрүлдү ✓'); }
+  catch(e){ toast('Өчүрүлгөн жок — интернетти текшериңиз'); }
 }
 
 /* ---------- donate view ---------- */
 function renderDonateView(){
-  document.getElementById('priceDisplay').textContent = cfg.price;
+  document.getElementById('priceDisplay').textContent = sharedCfg.price;
   const banner = document.getElementById('fundBanner');
   const activeBlock = document.getElementById('donateActiveBlock');
   if(campaign.status==='open'){
@@ -522,64 +716,127 @@ function renderDonateView(){
       <div class="detail">Жаңы фонд ачылганда бул жерде көрүнөт</div>`;
     activeBlock.style.display='none';
   }
-  document.getElementById('cardNumberDisplay').textContent = cfg.card || '— тапшырылган жок —';
-  document.getElementById('cardOwnerDisplay').textContent = cfg.owner || '';
+  document.getElementById('cardNumberDisplay').textContent = sharedCfg.card || '— тапшырылган жок —';
+  document.getElementById('cardOwnerDisplay').textContent = sharedCfg.owner || '';
   const qrWrap = document.getElementById('qrWrap');
   qrWrap.innerHTML = '';
-  if(cfg.qr){
-    const img = document.createElement('img'); img.src = cfg.qr; qrWrap.appendChild(img);
-  } else if(cfg.card){
+  if(sharedCfg.qr){
+    const img = document.createElement('img'); img.src = sharedCfg.qr; qrWrap.appendChild(img);
+  } else if(sharedCfg.card || sharedCfg.phone){
     const canvas = document.createElement('canvas'); qrWrap.appendChild(canvas);
-    new QRious({ element: canvas, value: cfg.card, size: 220, background:'#faf7f0', foreground:'#2a2622' });
+    new QRious({ element: canvas, value: sharedCfg.card || sharedCfg.phone, size: 220, background:'#faf7f0', foreground:'#2a2622' });
   }
 }
 function copyCardNumber(){
-  if(!cfg.card){ toast('Карта номери азырынча жок'); return; }
-  navigator.clipboard.writeText(cfg.card).then(()=>toast('Көчүрүлдү ✓'));
+  if(!sharedCfg.card){ toast('Карта номери азырынча жок'); return; }
+  if(window.AndroidBridge && window.AndroidBridge.copyText){
+    window.AndroidBridge.copyText(sharedCfg.card);
+    toast('Көчүрүлдү ✓');
+    return;
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(sharedCfg.card).then(()=>toast('Көчүрүлдү ✓')).catch(()=>fallbackCopy(sharedCfg.card));
+  } else {
+    fallbackCopy(sharedCfg.card);
+  }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position='fixed'; ta.style.left='-9999px';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); toast('Көчүрүлдү ✓'); }catch(e){ toast('Көчүрүлгөн жок'); }
+  document.body.removeChild(ta);
 }
 
-/* ---------- pin gate ---------- */
+/* ---------- pin gate (admin / super admin) ---------- */
 function refreshPinGate(){
   const gate = document.getElementById('pinGate');
   const content = document.getElementById('adminContent');
-  if(sessionStorage.getItem('ktr_admin_ok')==='1'){
+  const isAdmin = sessionStorage.getItem('ktr_admin_ok')==='1';
+  document.getElementById('screenshotBtn').style.display = isAdmin ? 'block' : 'none';
+  if(isAdmin){
     gate.style.display='none'; content.style.display='block';
+    applyRoleVisibility();
     renderFundAdmin(); renderList(); fillSettingsForm();
   } else {
     gate.style.display='block'; content.style.display='none';
-    document.getElementById('pinTitle').textContent = cfg.pin ? 'Админ PIN' : 'Алгачкы жолу: PIN коюңуз';
+    document.getElementById('pinTitle').textContent = cfg.superPin ? 'Кирүү' : 'Алгачкы жолу: Супер админ PIN коюңуз (6 сан)';
+  }
+}
+function applyRoleVisibility(){
+  const isSuper = sessionStorage.getItem('ktr_superadmin_ok')==='1';
+  const settingsBtn = document.getElementById('tabSettingsBtn');
+  settingsBtn.style.display = isSuper ? 'inline-block' : 'none';
+  renderArchive();
+  if(!isSuper && document.getElementById('sub-settings').style.display==='block'){
+    // if somehow on settings view without rights, bounce to fund tab
+    document.querySelectorAll('.admin-sub').forEach(b=>b.classList.remove('active'));
+    document.querySelector('.admin-sub[data-sub="fund"]').classList.add('active');
+    document.querySelectorAll('.sub-view').forEach(v=>v.style.display='none');
+    document.getElementById('sub-fund').style.display='block';
   }
 }
 function checkPin(){
   const val = document.getElementById('pinInput').value.trim();
-  if(!cfg.pin){
-    if(val.length<4){ document.getElementById('pinMsg').textContent='Кеминде 4 сан киргизиңиз'; return; }
-    cfg.pin = val; saveConfig();
+  if(!cfg.superPin){
+    if(val.length!==6 || !/^\d{6}$/.test(val)){ document.getElementById('pinMsg').textContent='6 сандан турган PIN киргизиңиз'; return; }
+    cfg.superPin = val; saveLocalConfig();
     sessionStorage.setItem('ktr_admin_ok','1');
-    toast('PIN коюлду ✓'); refreshPinGate(); return;
+    sessionStorage.setItem('ktr_superadmin_ok','1');
+    toast('Супер админ PIN коюлду ✓'); refreshPinGate(); return;
   }
-  if(val === cfg.pin){ sessionStorage.setItem('ktr_admin_ok','1'); refreshPinGate(); }
-  else { document.getElementById('pinMsg').textContent='PIN туура эмес'; }
+  if(val === cfg.superPin){
+    sessionStorage.setItem('ktr_admin_ok','1');
+    sessionStorage.setItem('ktr_superadmin_ok','1');
+    refreshPinGate(); return;
+  }
+  if(cfg.pin && val === cfg.pin){
+    sessionStorage.setItem('ktr_admin_ok','1');
+    sessionStorage.removeItem('ktr_superadmin_ok');
+    refreshPinGate(); return;
+  }
+  document.getElementById('pinMsg').textContent='PIN туура эмес';
 }
 
 /* ---------- receipt scan (public) ---------- */
 document.getElementById('cameraInput').addEventListener('change', handleImageSelect);
 document.getElementById('fileInput').addEventListener('change', handleImageSelect);
 
+function resizeImageDataUrl(dataUrl, maxDim, quality){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = function(){
+      let w = img.width, h = img.height;
+      if(w > maxDim || h > maxDim){
+        if(w > h){ h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = function(){ resolve(dataUrl); };
+    img.src = dataUrl;
+  });
+}
 function handleImageSelect(e){
   const file = e.target.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = function(ev){
-    const dataUrl = ev.target.result;
-    currentImageBase64 = dataUrl.split(',')[1];
-    currentImageMime = file.type || 'image/jpeg';
-    document.getElementById('previewImg').src = dataUrl;
+  reader.onload = async function(ev){
+    const rawDataUrl = ev.target.result;
+    const status = document.getElementById('statusLine');
+    status.textContent = 'Сүрөт даярдалып жатат...';
+    const resizedDataUrl = await resizeImageDataUrl(rawDataUrl, 1280, 0.82);
+    currentImageBase64 = resizedDataUrl.split(',')[1];
+    currentImageMime = 'image/jpeg';
+    document.getElementById('previewImg').src = resizedDataUrl;
     document.getElementById('scanIdle').style.display='none';
     document.getElementById('previewBlock').style.display='block';
     document.getElementById('reviewBlock').style.display='none';
     document.getElementById('rejectBlock').style.display='none';
-    document.getElementById('statusLine').textContent='';
+    status.textContent='';
   };
   reader.readAsDataURL(file);
 }
@@ -593,47 +850,197 @@ function resetScan(){
   document.getElementById('rejectBlock').style.display='none';
   document.getElementById('publicNamesInput').value='';
   document.getElementById('publicAmountInput').value='';
+  document.getElementById('publicAmountInput').readOnly=false;
+  document.getElementById('publicAmountInput').style.background='';
+  document.getElementById('amountLockedNote').style.display='none';
   document.getElementById('publicDatetimeInput').value='';
+}
+
+/* ---------- OCR text extraction helpers ---------- */
+const KY_WORD_CHARS = "A-Za-zА-ЯЁа-яёӨөҮүҢң0-9";
+function escapeRegExp(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function applyOcrCorrections(text){
+  const list = sharedCfg.ocrCorrections || [];
+  let out = text;
+  list.forEach(c=>{
+    if(!c.wrong) return;
+    const re = new RegExp(`(^|[^${KY_WORD_CHARS}])(${escapeRegExp(c.wrong)})(?=[^${KY_WORD_CHARS}]|$)`, 'g');
+    out = out.replace(re, (m, p1) => p1 + c.correct);
+  });
+  return out;
+}
+function computeWordDiff(a, b){
+  const n = a.length, m = b.length;
+  const dp = Array.from({length:n+1}, ()=>new Array(m+1).fill(0));
+  for(let i=n-1;i>=0;i--){
+    for(let j=m-1;j>=0;j--){
+      dp[i][j] = a[i]===b[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+    }
+  }
+  const ops = [];
+  let i=0, j=0;
+  while(i<n && j<m){
+    if(a[i]===b[j]){ ops.push({type:'eq'}); i++; j++; }
+    else if(dp[i+1][j] >= dp[i][j+1]){ ops.push({type:'del', val:a[i]}); i++; }
+    else { ops.push({type:'ins', val:b[j]}); j++; }
+  }
+  while(i<n){ ops.push({type:'del', val:a[i]}); i++; }
+  while(j<m){ ops.push({type:'ins', val:b[j]}); j++; }
+  return ops;
+}
+function extractCorrections(rawText, correctedText){
+  const a = rawText.split(/\s+/).filter(Boolean);
+  const b = correctedText.split(/\s+/).filter(Boolean);
+  const ops = computeWordDiff(a, b);
+  const pairs = [];
+  let i = 0;
+  while(i < ops.length){
+    if(ops[i].type === 'del'){
+      const dels = []; let k = i;
+      while(k < ops.length && ops[k].type === 'del'){ dels.push(ops[k].val); k++; }
+      const inss = []; let k2 = k;
+      while(k2 < ops.length && ops[k2].type === 'ins'){ inss.push(ops[k2].val); k2++; }
+      if(dels.length === inss.length && dels.length <= 3){
+        for(let x=0; x<dels.length; x++){
+          if(dels[x] !== inss[x] && dels[x].length>0) pairs.push({wrong: dels[x], correct: inss[x]});
+        }
+      }
+      i = k2;
+    } else { i++; }
+  }
+  return pairs;
+}
+function extractAmount(text){
+  // "1 000.00 KGS" / "1000.00 сом" / "300,00 С" (O!Dengi's som symbol) / "Сумма оплаты 1000.00" etc
+  const re = /(\d+(?:[\s\u00A0]\d{3})*(?:[.,]\d{1,2})?)\s*(KGS|сом|с\.|С(?![а-яА-Яa-zA-Z])|c(?![а-яА-Яa-zA-Z]))/gi;
+  let m, best = null;
+  while((m = re.exec(text))){
+    const num = parseFloat(m[1].replace(/[\s\u00A0]/g,'').replace(',', '.'));
+    if(!isNaN(num) && (best===null || num>best)) best = num; // biggest match is usually the main amount, not комиссия 0.00
+  }
+  if(best!==null) return best;
+  // fallback: look after "Сумма"/"Итого" label
+  const m2 = text.match(/(Сумма|Итого)[^\d]{0,20}([\d\s]+[.,]\d{2})/i);
+  if(m2) return parseFloat(m2[2].replace(/[\s\u00A0]/g,'').replace(',', '.'));
+  return null;
+}
+function extractDatetime(text){
+  const m = text.match(/(\d{2}[.\/]\d{2}[.\/]\d{4})[,\s]*(\d{1,2}:\d{2}(:\d{2})?)?/);
+  if(!m) return null;
+  return m[2] ? `${m[1]} ${m[2]}` : m[1];
+}
+function extractDestination(text){
+  // grab all digit-runs of plausible phone/card/account length, ignore dates
+  const clean = text.replace(/\d{2}[.\/]\d{2}[.\/]\d{4}/g, ' ');
+  // Prefer the number right after the "Реквизит" label — on KICB/Элдик Банк receipts this is
+  // where the recipient's own phone or card number is shown (not "Номер чека"/"№ документа",
+  // which are just the receipt's own serial numbers and must never be used as the destination).
+  const reqIdx = clean.search(/Реквизит/i);
+  if(reqIdx >= 0){
+    const after = clean.slice(reqIdx, reqIdx + 80);
+    const m = after.match(/\d[\d\s]{6,18}\d/);
+    if(m){
+      const d = m[0].replace(/\s/g,'');
+      if(d.length>=7 && d.length<=20) return d;
+    }
+  }
+  // fallback: scan line by line, skipping lines that are clearly NOT the recipient's own
+  // number — the receipt's own serial numbers ("Номер чека"/"квитанции"/"№ документа") and the
+  // sender's own funding account ("Оплачено со счета"/"Списано со счета") must never be used.
+  const excludeLabels = /(номер\s*чека|№\s*чека|№\s*документа|номер\s*документа|чек\s*№|квитанци|исполнено|со\s*счета)/i;
+  const candidates = [];
+  clean.split('\n').forEach(line=>{
+    if(excludeLabels.test(line)) return;
+    (line.match(/\d[\d\s]{6,18}\d/g) || []).forEach(r=>{
+      const d = r.replace(/\s/g,'');
+      if(d.length>=7 && d.length<=20) candidates.push(d);
+    });
+  });
+  for(const d of candidates){ if(classifyDestinationMatch(d)!=='none' && classifyDestinationMatch(d)!=='unknown') return d; }
+  return candidates[0] || null;
+}
+function isNameLike(s){
+  if(!s) return false;
+  const t = s.trim();
+  if(t.length<2) return false;
+  const digitCount = (t.match(/\d/g)||[]).length;
+  if(digitCount > 1) return false; // reject phone/card-like strings, allow 1 stray OCR digit
+  return /[А-ЯЁа-яёӨөҮүҢңA-Za-z]/.test(t);
+}
+function extractRecipientName(text){
+  const labels = ['Наименование абонента','Получатель','Кабыл алуучу','Абонент','Реквизиты','Реквизит'];
+  const lines = text.split('\n');
+  for(const label of labels){
+    for(let i=0;i<lines.length;i++){
+      if(lines[i].includes(label)){
+        let after = lines[i].split(label)[1];
+        if(after) after = after.trim().replace(/^[:\-]\s*/,'');
+        if(isNameLike(after)) return after;
+        if(lines[i+1] && isNameLike(lines[i+1].trim())) return lines[i+1].trim();
+      }
+    }
+  }
+  // "Операция: Перевод по QR: Аты" / "Перевод: Аты" сыяктуу форматтар (мис. Optima24)
+  const m = text.match(/Перевод(?:\s*по\s*QR)?\s*:\s*([^\n]{2,40})/i);
+  if(m && isNameLike(m[1].trim())) return m[1].trim();
+  return null;
 }
 
 async function analyzeReceipt(){
   if(campaign.status!=='open'){ toast('Азырынча ачык фонд жок'); return; }
-  if(!cfg.gemini){ toast('Gemini API ачкычы жөндөлгөн эмес — Админ → Жөндөөдөн киргизиңиз'); return; }
+  if(typeof Tesseract === 'undefined'){ toast('Окуу китепканасы жүктөлгөн жок — интернетти текшериңиз'); return; }
   const btn = document.getElementById('analyzeBtn');
   const status = document.getElementById('statusLine');
   btn.disabled = true;
-  status.innerHTML = '<span class="spinner"></span> AI чекти окуп жатат...';
-  const prompt = 'Бул акча которуу чегинин (банк квитанциясынын) сүрөтү. Тап: 1) Чектеги жөнөтүүчүнүн комментарийинде/назначение платежада жазылган аты-жөндөр (бир же бир нечe болушу мүмкүн), 2) которулган сумма, 3) чектеги так дата/убакыт (көрүнсө), 4) "Получатель" талаасында көрсөтүлгөн алуучунун аты, 5) төлөм кайсы телефон номерине же карта номерине жөнөтүлгөн (Назначение платежа же Получатель талааларынан, номердин цифраларын гана). Жооп катары ТАКЫР башка сөз кошпостон, так ушул JSON форматында гана жаз: {"names": ["Аты Жөнү"], "amount": 0, "datetime": "YYYY-MM-DD HH:MM же null", "recipientName": "Получательдин аты же null", "destination": "телефон же карта номеринин цифралары же null"}.';
+  status.innerHTML = '<span class="spinner"></span> Чек окулуп жатат...';
   try{
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${cfg.gemini}`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        contents:[{ parts:[
-          { text: prompt },
-          { inline_data:{ mime_type: currentImageMime, data: currentImageBase64 } }
-        ]}]
-      })
+    const imgDataUrl = document.getElementById('previewImg').src;
+    const { data } = await Tesseract.recognize(imgDataUrl, 'rus+eng', {
+      logger: m => {
+        if(m.status==='recognizing text'){
+          status.innerHTML = `<span class="spinner"></span> Окулуп жатат... ${Math.round((m.progress||0)*100)}%`;
+        }
+      }
     });
-    const data = await res.json();
-    let text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    text = text.replace(/```json/gi,'').replace(/```/g,'').trim();
-    const parsed = JSON.parse(text);
+    const text = applyOcrCorrections(data.text || '');
+    const amount = extractAmount(text);
+    const datetime = extractDatetime(text);
+    const destination = extractDestination(text);
+    const recipientName = extractRecipientName(text);
 
-    const match = matchesDestination(parsed.destination);
+    const cls = classifyDestinationMatch(destination);
     document.getElementById('previewBlock').style.display='none';
 
-    if(match === false){
+    // OCR can't reliably tell a personal transfer from a bill payment (Gemini's isPersonalTransfer
+    // check is gone), so that filter is skipped — the reviewer must judge the receipt visually.
+    if(cls === 'none'){
       document.getElementById('rejectReason').textContent =
-        `Чек "${parsed.recipientName || 'белгисиз алуучу'}" (${parsed.destination || '—'}) дегенге жөнөтүлгөн, бул сиздин конфигурацияланган номериңизге/картаңызга дал келген жок.`;
+        `Табылган номер (${destination || '—'}) фондго коюлган карта/телефон номерине дал келген жок. Админ тарабынан коюлган номер: ${sharedCfg.phone || sharedCfg.card || '—'}${sharedCfg.owner ? (' ' + sharedCfg.owner) : ''}. Эгер бул туура чек болсо, "Башка чек тандоо" басып, четтен тартып көрүңүз же маалыматты кол менен киргизиңиз.`;
       document.getElementById('rejectBlock').style.display='block';
       status.textContent='';
-      toast('Четке кагылды — башка алуучуга жөнөтүлгөн');
+      toast('Дал келбеди — текшериңиз');
       btn.disabled=false;
       return;
     }
 
-    if(isExactReceiptDuplicate(parsed.amount, parsed.datetime)){
+    // Digit match alone isn't always available (some apps like Optima24 show only a name,
+    // no phone/card number). When we're not confidently sure from digits (cls !== 'strong'),
+    // cross-check the OCR'd recipient name against the fund owner's name and reject on a
+    // clear mismatch — this is what catches receipts paid to a different person entirely.
+    if(cls !== 'strong' && recipientName && sharedCfg.owner){
+      const nameOk = namesRoughlyMatch(recipientName, sharedCfg.owner);
+      if(nameOk === false){
+        document.getElementById('rejectReason').textContent =
+          `Чектеги алуучунун аты ("${recipientName}") фондго коюлган атка ("${sharedCfg.owner}") дал келген жок. Эгер бул туура чек болсо, "Башка чек тандоо" басып кайра тартып көрүңүз же маалыматты кол менен киргизиңиз.`;
+        document.getElementById('rejectBlock').style.display='block';
+        status.textContent='';
+        toast('Четке кагылды — башка алуучуга жөнөтүлгөн');
+        btn.disabled=false;
+        return;
+      }
+    }
+
+    if(isExactReceiptDuplicate(amount, datetime)){
       document.getElementById('rejectReason').textContent = 'Бул чек мурда каттлаган (окшош дата/убакыт жана сумма табылды). Бир чек бир жолу гана кошулат.';
       document.getElementById('rejectBlock').style.display='block';
       status.textContent='';
@@ -642,20 +1049,42 @@ async function analyzeReceipt(){
       return;
     }
 
-    document.getElementById('publicNamesInput').value = (parsed.names||[]).join('\n');
-    document.getElementById('publicAmountInput').value = parsed.amount || '';
-    document.getElementById('publicDatetimeInput').value = parsed.datetime || '';
-    const info = document.getElementById('recipientInfo');
-    if(match === true){
-      info.textContent = `✓ Алуучу текшерилди: ${parsed.recipientName || ''} (${parsed.destination || ''})`;
+    // names left blank for manual entry — OCR layout varies too much by bank app to trust automatically
+    document.getElementById('publicNamesInput').value = '';
+    const amountInput = document.getElementById('publicAmountInput');
+    const amountNote = document.getElementById('amountLockedNote');
+    amountInput.value = amount || '';
+    if(amount){
+      // amount was read straight from the receipt — lock it so it can't be edited to no longer
+      // match what was actually transferred; if it's wrong, the person must contact the admin.
+      amountInput.readOnly = true;
+      amountInput.style.background = 'var(--paper-2)';
+      amountNote.style.display = 'block';
+      const waMsg = encodeURIComponent(`Салам! Кайрымдуулук чегимдеги сумма туура эмес көрүнүп жатат (Окулган сумма: ${amount} сом). Текшерип бере аласызбы?`);
+      const waLink = document.getElementById('amountWhatsappLink');
+      if(sharedCfg.whatsapp){ waLink.href = `https://wa.me/${sharedCfg.whatsapp}?text=${waMsg}`; waLink.style.display='inline'; }
+      else { waLink.removeAttribute('href'); waLink.style.display='none'; }
     } else {
-      info.textContent = `⚠️ Алуучу такталган жок — колдонуучунун сөзүнө ишенип кошулат`;
+      amountInput.readOnly = false;
+      amountInput.style.background = '';
+      amountNote.style.display = 'none';
+    }
+    document.getElementById('publicDatetimeInput').value = datetime || '';
+    const info = document.getElementById('recipientInfo');
+    if(cls === 'strong'){
+      info.textContent = `✓ Номер дал келди: ${destination || ''}${recipientName ? (' — '+recipientName) : ''}. Автоматтык окуу так эмес болушу мүмкүн — сумманы жана атыңызды текшериңиз.`;
+    } else if(cls === 'weak'){
+      info.textContent = `✓ Картанын акыркы сандары дал келди: ${destination || ''}${recipientName ? (' — '+recipientName) : ''}. Автоматтык окуу так эмес болушу мүмкүн — сумманы жана атыңызды текшериңиз.`;
+    } else {
+      info.textContent = recipientName
+        ? `⚠️ Алуучунун номери табылган жок, бирок аты ("${recipientName}") дал келди. Сумманы текшериңиз.`
+        : `⚠️ Алуучу номери жана аты автоматтык табылган жок. Сумманы жана аты-жөнүңүздү өзүңүз киргизиңиз.`;
     }
     document.getElementById('reviewBlock').style.display='block';
     recalcPublic();
-    toast('AI окуду — текшерип бекитиңиз');
+    toast('Окулду — аты-жөнүңүздү жана сумманы текшерип киргизиңиз');
   }catch(e){
-    status.textContent = 'AI окуй алган жок — маалыматты кол менен киргизиңиз';
+    status.textContent = 'Окуй алган жок — маалыматты кол менен киргизиңиз';
     document.getElementById('reviewBlock').style.display='block';
     recalcPublic();
   }
@@ -663,21 +1092,30 @@ async function analyzeReceipt(){
 }
 
 function normalizeDigits(s){ return (s||'').replace(/[^0-9]/g,''); }
-function matchesDestination(dest){
+function classifyDestinationMatch(dest){
   const destDigits = normalizeDigits(dest);
-  if(!destDigits) return null;
-  const phoneDigits = normalizeDigits(cfg.phone);
-  const cardDigits = normalizeDigits(cfg.card);
-  if(!phoneDigits && !cardDigits) return null;
+  if(!destDigits) return 'unknown';
+  const phoneDigits = normalizeDigits(sharedCfg.phone);
+  const cardDigits = normalizeDigits(sharedCfg.card);
+  if(!phoneDigits && !cardDigits) return 'unknown';
   if(phoneDigits && destDigits.length>=7){
     const suffixLen = Math.min(9, phoneDigits.length, destDigits.length);
-    if(suffixLen>=7 && phoneDigits.slice(-suffixLen) === destDigits.slice(-suffixLen)) return true;
+    if(suffixLen>=7 && phoneDigits.slice(-suffixLen) === destDigits.slice(-suffixLen)) return 'strong';
   }
   if(cardDigits){
     const suffixLen = Math.min(destDigits.length, cardDigits.length, 4);
-    if(suffixLen>=4 && cardDigits.slice(-suffixLen) === destDigits.slice(-suffixLen)) return true;
+    if(suffixLen>=4 && cardDigits.slice(-suffixLen) === destDigits.slice(-suffixLen)) return 'weak';
   }
-  return false;
+  return 'none';
+}
+function namesRoughlyMatch(a,b){
+  if(!a || !b) return null;
+  const na = normalizeName(a), nb = normalizeName(b);
+  if(!na || !nb) return null;
+  const wa = na.split(' ').filter(Boolean);
+  const wb = nb.split(' ').filter(Boolean);
+  const overlap = wa.some(w=>w.length>1 && wb.includes(w));
+  return overlap;
 }
 function isExactReceiptDuplicate(amount, datetimeRaw){
   if(!datetimeRaw) return false;
@@ -693,13 +1131,13 @@ function recalcPublic(){ doRecalc('publicNamesInput','publicAmountInput','public
 function doRecalc(namesId, amountId, checkId, btnId){
   const names = parseNamesFrom(namesId);
   const amount = parseFloat(document.getElementById(amountId).value)||0;
-  const required = names.length * cfg.price;
+  const required = names.length * sharedCfg.price;
   const el = document.getElementById(checkId);
   const btn = document.getElementById(btnId);
   if(names.length===0){ el.className='amount-check neutral'; el.textContent='Аты-жөндөрдү киргизиңиз'; btn.disabled=true; return; }
   if(amount===required){
     el.className='amount-check ok';
-    el.textContent = `✓ Дал келди — ${names.length} адам × ${cfg.price} = ${required} сом`;
+    el.textContent = `✓ Дал келди — ${names.length} адам × ${sharedCfg.price} = ${required} сом`;
     btn.disabled=false;
   } else {
     el.className='amount-check bad';
@@ -747,10 +1185,9 @@ function confirmAddAnyway(){
   if(pendingEntry) commitEntry(pendingEntry, true);
 }
 
-function commitEntry(entry, wasDuplicate){
+async function commitEntry(entry, wasDuplicate){
   const now = Date.now();
   const record = {
-    id: now.toString(36)+Math.random().toString(36).slice(2,6),
     names: entry.names,
     amount: entry.amount,
     date: new Date(now).toLocaleString('ky-KG'),
@@ -759,13 +1196,14 @@ function commitEntry(entry, wasDuplicate){
     duplicate: !!wasDuplicate,
     sent: false
   };
-  entries.push(record);
-  saveEntries();
-  toast('Кошулду ✓');
-  sendTelegramForRecord(record, wasDuplicate);
-  if(pendingIsPublic){ resetScan(); } else { document.getElementById('namesInput').value=''; document.getElementById('amountInput').value=''; recalc(); }
-  renderList();
-  renderPublicList();
+  try{
+    const ref = await entriesCol.add(record);
+    toast('Кошулду ✓');
+    sendTelegramForRecord(Object.assign({ id: ref.id }, record), wasDuplicate);
+    if(pendingIsPublic){ resetScan(); } else { document.getElementById('namesInput').value=''; document.getElementById('amountInput').value=''; recalc(); }
+  }catch(e){
+    toast('Кошулган жок — интернетти текшериңиз');
+  }
 }
 
 /* ---------- telegram ---------- */
@@ -775,8 +1213,7 @@ async function sendTelegramForRecord(record, wasDuplicate){
   const prefix = wasDuplicate ? '⚠️ ОКШОШ АТ (текшериңиз)\n' : '✅ Төлөм кабыл алынды\n';
   const text = `${prefix}${lines}\n\nСумма: ${record.amount} сом\nУбакыт: ${record.transferLabel}`;
   const ok = await sendTelegramRaw(text);
-  record.sent = ok;
-  saveEntries();
+  if(ok && record.id){ try{ await entriesCol.doc(record.id).update({ sent:true }); }catch(e){} }
 }
 async function sendTelegramRaw(text){
   try{
@@ -799,10 +1236,10 @@ function resendEntry(id){
 
 /* ---------- whatsapp alert (manual tap) ---------- */
 function sendWhatsappAlert(){
-  if(!cfg.whatsapp){ toast('Админдин WhatsApp номери жөндөлгөн эмес'); return; }
+  if(!sharedCfg.whatsapp){ toast('Админдин WhatsApp номери жөндөлгөн эмес'); return; }
   const names = pendingDuplicateNames.map(d=>d.name).join(', ');
   const msg = encodeURIComponent(`⚠️ Кайрымдуулук эсебинде окшош ат табылды: ${names}. Текшерип көрүңүзчү.`);
-  window.open(`https://wa.me/${cfg.whatsapp}?text=${msg}`, '_blank');
+  window.open(`https://wa.me/${sharedCfg.whatsapp}?text=${msg}`, '_blank');
   document.getElementById('dupModal').classList.remove('active');
 }
 
@@ -835,7 +1272,7 @@ function renderPublicList(){
   sortedEntries.forEach(e=>{
     e.names.forEach(n=>{
       idx++;
-      lines.push(`<div class="notebook-line">${idx}. ${escapeHtml(n)} — ${cfg.price} сом</div>`);
+      lines.push(`<div class="notebook-line">${idx}. ${escapeHtml(n)} — ${sharedCfg.price} сом</div>`);
     });
   });
   const totalSum = entries.reduce((s,e)=>s+e.amount,0);
@@ -843,9 +1280,8 @@ function renderPublicList(){
   document.getElementById('pubTotalSum').textContent = totalSum;
   notebook.innerHTML = lines.length ? lines.join('') : '<div class="notebook-empty">Азырынча эч ким которгон жок. Биринчи болуңуз!</div>';
 }
-function deleteEntry(id){
-  entries = entries.filter(e=>e.id!==id);
-  saveEntries(); renderList(); renderPublicList();
+async function deleteEntry(id){
+  try{ await entriesCol.doc(id).delete(); }catch(e){ toast('Өчүрүлгөн жок — интернетти текшериңиз'); }
 }
 function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -868,14 +1304,19 @@ async function takeScreenshot(){
     container.style.left = '-9999px';
     container.style.top = '0';
     container.style.width = '420px';
-    container.innerHTML = chunks[c].map((n,i)=>`<div class="notebook-line">${start+i}. ${escapeHtml(n)} — ${cfg.price} сом</div>`).join('');
+    container.innerHTML = chunks[c].map((n,i)=>`<div class="notebook-line">${start+i}. ${escapeHtml(n)} — ${sharedCfg.price} сом</div>`).join('');
     document.body.appendChild(container);
     try{
       const canvas = await html2canvas(container, { backgroundColor:'#fffdf6', scale:2 });
-      const link = document.createElement('a');
-      link.download = `kayrymduuluk-tizme-${start}-${end}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      const filename = `kayrymduuluk-tizme-${start}-${end}.png`;
+      if(window.AndroidBridge && window.AndroidBridge.saveImage){
+        window.AndroidBridge.saveImage(canvas.toDataURL('image/png').split(',')[1], filename);
+      } else {
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }
       await new Promise(r=>setTimeout(r,300));
     }catch(e){ /* skip failed chunk */ }
     document.body.removeChild(container);
@@ -887,43 +1328,144 @@ async function takeScreenshot(){
 function fillSettingsForm(){
   document.getElementById('cfgToken').value = cfg.token;
   document.getElementById('cfgChatId').value = cfg.chatId;
-  document.getElementById('cfgGemini').value = cfg.gemini;
-  document.getElementById('cfgPrice').value = cfg.price;
-  document.getElementById('cfgCard').value = cfg.card;
-  document.getElementById('cfgPhone').value = cfg.phone;
-  document.getElementById('cfgOwner').value = cfg.owner;
-  document.getElementById('cfgWhatsapp').value = cfg.whatsapp;
-  document.getElementById('qrFileStatus').textContent = cfg.qr ? 'Сүрөт жүктөлгөн ✓' : '';
+  document.getElementById('cfgPrice').value = sharedCfg.price;
+  document.getElementById('cfgCard').value = sharedCfg.card;
+  document.getElementById('cfgPhone').value = sharedCfg.phone;
+  document.getElementById('cfgOwner').value = sharedCfg.owner;
+  document.getElementById('cfgWhatsapp').value = sharedCfg.whatsapp;
+  document.getElementById('qrFileStatus').textContent = sharedCfg.qr ? 'Сүрөт жүктөлгөн ✓' : '';
+  renderOcrCorrectionsList();
 }
+/* ---------- OCR training (super admin) ---------- */
+let trainImageDataUrl = null;
+document.getElementById('trainCameraInput').addEventListener('change', handleTrainImageSelect);
+document.getElementById('trainFileInput').addEventListener('change', handleTrainImageSelect);
+function handleTrainImageSelect(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(ev){
+    const resized = await resizeImageDataUrl(ev.target.result, 1280, 0.82);
+    trainImageDataUrl = resized;
+    document.getElementById('trainPreviewImg').src = resized;
+    document.getElementById('trainIdle').style.display='none';
+    document.getElementById('trainPreviewBlock').style.display='block';
+    document.getElementById('trainEditBlock').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+function resetTrainScan(){
+  trainImageDataUrl = null;
+  document.getElementById('trainCameraInput').value='';
+  document.getElementById('trainFileInput').value='';
+  document.getElementById('trainIdle').style.display='flex';
+  document.getElementById('trainPreviewBlock').style.display='none';
+  document.getElementById('trainEditBlock').style.display='none';
+  document.getElementById('trainStatusLine').textContent='';
+}
+async function runTrainOcr(){
+  if(typeof Tesseract === 'undefined'){ toast('Окуу китепканасы жүктөлгөн жок'); return; }
+  const btn = document.getElementById('trainOcrBtn');
+  const status = document.getElementById('trainStatusLine');
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner"></span> Окулуп жатат...';
+  try{
+    const { data } = await Tesseract.recognize(trainImageDataUrl, 'rus+eng', {
+      logger: m => { if(m.status==='recognizing text'){ status.innerHTML = `<span class="spinner"></span> Окулуп жатат... ${Math.round((m.progress||0)*100)}%`; } }
+    });
+    const raw = applyOcrCorrections(data.text || '');
+    document.getElementById('trainRawText').value = raw;
+    document.getElementById('trainCorrectedText').value = raw;
+    document.getElementById('trainPreviewBlock').style.display='none';
+    document.getElementById('trainEditBlock').style.display='block';
+    status.textContent='';
+  }catch(e){
+    status.textContent = 'Окуй алган жок';
+  }
+  btn.disabled=false;
+}
+async function saveOcrTraining(){
+  const raw = document.getElementById('trainRawText').value;
+  const corrected = document.getElementById('trainCorrectedText').value;
+  const pairs = extractCorrections(raw, corrected);
+  if(pairs.length===0){ toast('Айырма табылган жок — текстти оңдодуңузбу?'); return; }
+  const existing = (sharedCfg.ocrCorrections||[]).slice();
+  pairs.forEach(p=>{
+    const idx = existing.findIndex(x=>x.wrong===p.wrong);
+    if(idx>=0) existing[idx] = p; else existing.push(p);
+  });
+  const updatedShared = Object.assign({}, sharedCfg, { ocrCorrections: existing });
+  try{
+    await sharedCfgRef.set(updatedShared);
+    toast(`Сакталды ✓ (${pairs.length} оңдоо)`);
+    resetTrainScan();
+  }catch(e){ toast('Сакталган жок — интернетти текшериңиз'); }
+}
+async function deleteOcrCorrection(encodedWrong){
+  const wrong = decodeURIComponent(encodedWrong);
+  const existing = (sharedCfg.ocrCorrections||[]).filter(x=>x.wrong!==wrong);
+  const updatedShared = Object.assign({}, sharedCfg, { ocrCorrections: existing });
+  try{ await sharedCfgRef.set(updatedShared); toast('Өчүрүлдү ✓'); }
+  catch(e){ toast('Өчүрүлгөн жок — интернетти текшериңиз'); }
+}
+function renderOcrCorrectionsList(){
+  const el = document.getElementById('trainCorrectionsList');
+  if(!el) return;
+  const list = sharedCfg.ocrCorrections || [];
+  if(list.length===0){ el.innerHTML = '<div class="center-muted">Азырынча сакталган оңдоо жок</div>'; return; }
+  el.innerHTML = `<div class="center-muted" style="margin-bottom:6px;">Сакталган оңдоолор (${list.length})</div>` + list.map(c=>`
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:12px; padding:5px 0; border-bottom:1px solid var(--line);">
+      <div style="overflow-wrap:anywhere;"><s style="color:var(--ink-muted);">${escapeHtml(c.wrong)}</s> → <b>${escapeHtml(c.correct)}</b></div>
+      <button onclick="deleteOcrCorrection('${encodeURIComponent(c.wrong)}')" style="flex-shrink:0; border:1px solid var(--red); background:#fff; color:var(--red); border-radius:4px; padding:3px 8px; font-size:11px; cursor:pointer;">Өчүрүү</button>
+    </div>`).join('');
+}
+
+let pendingQrDataUrl = null;
 document.getElementById('cfgQrFile').addEventListener('change', function(e){
   const file = e.target.files[0];
   if(!file) return;
   const reader = new FileReader();
   reader.onload = function(ev){
-    cfg.qr = ev.target.result;
+    pendingQrDataUrl = ev.target.result;
     document.getElementById('qrFileStatus').textContent = 'Сүрөт жүктөлдү ✓ (Сактоо баскычын басыңыз)';
   };
   reader.readAsDataURL(file);
 });
-function saveSettings(){
+async function saveSettings(){
   cfg.token = document.getElementById('cfgToken').value.trim();
   cfg.chatId = document.getElementById('cfgChatId').value.trim();
-  cfg.gemini = document.getElementById('cfgGemini').value.trim();
-  cfg.price = parseFloat(document.getElementById('cfgPrice').value)||150;
-  cfg.card = document.getElementById('cfgCard').value.trim();
-  cfg.phone = document.getElementById('cfgPhone').value.trim();
-  cfg.owner = document.getElementById('cfgOwner').value.trim();
-  cfg.whatsapp = document.getElementById('cfgWhatsapp').value.trim().replace(/[^0-9]/g,'');
-  const newPin = document.getElementById('cfgPin').value.trim();
-  if(newPin.length>=4) cfg.pin = newPin;
-  saveConfig();
-  document.getElementById('cfgPin').value='';
-  toast('Сакталды ✓');
-  renderDonateView(); recalc(); renderPublicList();
+  const newAdminPin = document.getElementById('cfgAdminPin').value.trim();
+  const newSuperPin = document.getElementById('cfgSuperPin').value.trim();
+  let pinMsg = '';
+  if(newAdminPin){
+    if(/^\d{6}$/.test(newAdminPin)){ cfg.pin = newAdminPin; }
+    else { pinMsg += ' Админ PIN 6 сан болушу керек — өзгөртүлгөн жок.'; }
+  }
+  if(newSuperPin){
+    if(/^\d{6}$/.test(newSuperPin)){ cfg.superPin = newSuperPin; }
+    else { pinMsg += ' Супер админ PIN 6 сан болушу керек — өзгөртүлгөн жок.'; }
+  }
+  saveLocalConfig();
+
+  const updatedShared = Object.assign({}, sharedCfg);
+  updatedShared.price = parseFloat(document.getElementById('cfgPrice').value)||150;
+  updatedShared.card = document.getElementById('cfgCard').value.trim();
+  updatedShared.phone = document.getElementById('cfgPhone').value.trim();
+  updatedShared.owner = document.getElementById('cfgOwner').value.trim();
+  updatedShared.whatsapp = document.getElementById('cfgWhatsapp').value.trim().replace(/[^0-9]/g,'');
+  if(pendingQrDataUrl){ updatedShared.qr = pendingQrDataUrl; pendingQrDataUrl = null; }
+  try{
+    await sharedCfgRef.set(updatedShared);
+    document.getElementById('cfgAdminPin').value='';
+    document.getElementById('cfgSuperPin').value='';
+    toast(pinMsg ? ('Сакталды, бирок:'+pinMsg) : 'Сакталды ✓');
+  }catch(e){
+    toast('Жалпы жөндөөлөр сакталган жок — интернетти текшериңиз');
+  }
 }
 
 /* ---------- init ---------- */
-renderDonateView();
+loadFirebaseAndInit();
 refreshPinGate();
 recalc();
 recalcPublic();
